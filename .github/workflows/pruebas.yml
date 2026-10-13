@@ -41,6 +41,7 @@ jobs:
       - name: Compilar para pruebas
         run: |
           set -o pipefail
+          mkdir -p build
           xcodebuild build-for-testing \
             -project HydroFesFlow.xcodeproj \
             -scheme HydroFesFlow \
