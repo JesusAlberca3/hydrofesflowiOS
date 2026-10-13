@@ -17,7 +17,7 @@ jobs:
     container: swift:6.2-noble
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Versión de Swift
         run: swift --version
       - name: Pruebas del dominio
@@ -29,56 +29,55 @@ jobs:
     timeout-minutes: 45
     env:
       DESTINO: platform=iOS Simulator,name=iPhone 17,OS=26.5
+      DERIVADOS: ${{ github.workspace }}/DerivedData
+      RESULTADOS: ${{ github.workspace }}/resultados-ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Seleccionar Xcode 26.5
         run: |
           sudo xcode-select -s /Applications/Xcode_26.5.app
           xcodebuild -version
-          xcrun simctl list runtimes
+          mkdir -p "$RESULTADOS"
 
       - name: Compilar para pruebas
         run: |
           set -o pipefail
-          mkdir -p build
           xcodebuild build-for-testing \
             -project HydroFesFlow.xcodeproj \
             -scheme HydroFesFlow \
             -destination "$DESTINO" \
-            -derivedDataPath build/DerivedData \
+            -derivedDataPath "$DERIVADOS" \
             CODE_SIGNING_ALLOWED=NO \
-            | tee build/compilacion.log
+            > "$RESULTADOS/compilacion.log" 2>&1 \
+            || { grep -E "error:|warning: .*will be an error" "$RESULTADOS/compilacion.log"; tail -40 "$RESULTADOS/compilacion.log"; exit 1; }
+          grep -c "warning:" "$RESULTADOS/compilacion.log" || true
 
       - name: Pruebas unitarias
         run: |
-          set -o pipefail
           xcodebuild test-without-building \
             -project HydroFesFlow.xcodeproj \
             -scheme HydroFesFlow \
             -destination "$DESTINO" \
-            -derivedDataPath build/DerivedData \
+            -derivedDataPath "$DERIVADOS" \
             -only-testing:HydroFesFlowTests \
-            -resultBundlePath build/unitarias.xcresult
+            -resultBundlePath "$RESULTADOS/unitarias.xcresult"
 
       - name: Pruebas de interfaz
         run: |
-          set -o pipefail
           xcodebuild test-without-building \
             -project HydroFesFlow.xcodeproj \
             -scheme HydroFesFlow \
             -destination "$DESTINO" \
-            -derivedDataPath build/DerivedData \
+            -derivedDataPath "$DERIVADOS" \
             -only-testing:HydroFesFlowUITests \
-            -resultBundlePath build/interfaz.xcresult
+            -resultBundlePath "$RESULTADOS/interfaz.xcresult"
 
       - name: Guardar resultados
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: resultados-ios
-          path: |
-            build/*.xcresult
-            build/compilacion.log
+          path: resultados-ci
           if-no-files-found: ignore
           retention-days: 7
