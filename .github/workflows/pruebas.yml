@@ -1,0 +1,83 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dominio:
+    name: Motor de cálculo (swift test)
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versión de Swift
+        run: swift --version
+      - name: Pruebas del dominio
+        run: swift test --parallel
+
+  ios:
+    name: App iOS (xcodebuild)
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      DESTINO: platform=iOS Simulator,name=iPhone 17,OS=26.5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seleccionar Xcode 26.5
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.5.app
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Compilar para pruebas
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project HydroFesFlow.xcodeproj \
+            -scheme HydroFesFlow \
+            -destination "$DESTINO" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee build/compilacion.log
+
+      - name: Pruebas unitarias
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project HydroFesFlow.xcodeproj \
+            -scheme HydroFesFlow \
+            -destination "$DESTINO" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:HydroFesFlowTests \
+            -resultBundlePath build/unitarias.xcresult
+
+      - name: Pruebas de interfaz
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project HydroFesFlow.xcodeproj \
+            -scheme HydroFesFlow \
+            -destination "$DESTINO" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:HydroFesFlowUITests \
+            -resultBundlePath build/interfaz.xcresult
+
+      - name: Guardar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-ios
+          path: |
+            build/*.xcresult
+            build/compilacion.log
+          if-no-files-found: ignore
+          retention-days: 7
