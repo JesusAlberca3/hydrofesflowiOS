@@ -4,6 +4,7 @@ import UIKit
 private let localeNumerico = Locale(identifier: "en_US_POSIX")
 
 enum IdentificadorUI {
+    static let inicio = "panel.inicio"
     static let resultados = "panel.resultados"
 }
 
@@ -396,6 +397,9 @@ struct PanelResultados: View {
                             .font(.body.monospacedDigit().weight(renglon.tono == .normal ? .regular : .semibold))
                             .foregroundStyle(color(renglon.tono))
                             .multilineTextAlignment(.trailing)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .layoutPriority(1)
                     }
                     if let nota = renglon.nota {
                         Text(nota)
@@ -500,6 +504,7 @@ struct BarraCalcular: View {
         Button(action: accion) {
             Label(texto, systemImage: "function")
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(habilitado ? hidro.sobrePrimario : Color.secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
         }
@@ -535,6 +540,14 @@ struct PantallaCalculo<Content: View>: View {
     var onLimpiar: () -> Void
     @ViewBuilder var content: Content
 
+    private func mostrarResultados(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut) {
+                proxy.scrollTo(IdentificadorUI.resultados, anchor: .top)
+            }
+        }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -545,6 +558,7 @@ struct PantallaCalculo<Content: View>: View {
                 .padding(.vertical, 12)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
+                .id(IdentificadorUI.inicio)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(hidro.fondo.ignoresSafeArea())
@@ -552,11 +566,26 @@ struct PantallaCalculo<Content: View>: View {
                 BarraCalcular(texto: accion, habilitado: accionHabilitada) {
                     ocultarTeclado()
                     onCalcular()
-                    DispatchQueue.main.async {
-                        withAnimation(.easeInOut) {
-                            proxy.scrollTo(IdentificadorUI.resultados, anchor: .top)
+                    mostrarResultados(proxy)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Cargar ejemplo", systemImage: "wand.and.stars") {
+                            ocultarTeclado()
+                            withAnimation { onEjemplo() }
+                            mostrarResultados(proxy)
                         }
+                        Button("Limpiar datos", systemImage: "eraser", role: .destructive) {
+                            withAnimation { onLimpiar() }
+                            withAnimation { proxy.scrollTo(IdentificadorUI.inicio, anchor: .top) }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
+                    .accessibilityLabel("Acciones")
+                    .accessibilityIdentifier("menu.acciones")
                 }
             }
         }
@@ -581,20 +610,6 @@ struct PantallaCalculo<Content: View>: View {
                 .foregroundStyle(hidro.sobreContenedorPrimario)
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Cargar ejemplo", systemImage: "wand.and.stars") {
-                        withAnimation { onEjemplo() }
-                    }
-                    Button("Limpiar datos", systemImage: "eraser", role: .destructive) {
-                        withAnimation { onLimpiar() }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel("Acciones")
-                .accessibilityIdentifier("menu.acciones")
             }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()

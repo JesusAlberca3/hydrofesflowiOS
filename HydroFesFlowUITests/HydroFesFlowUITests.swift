@@ -33,6 +33,7 @@ final class HydroFesFlowUITests: XCTestCase {
     func testDiametroCeroMuestraErrorSinCerrarLaApp() {
         abrir("inicio.conductos", "opcion.Caudal")
         cargarEjemplo()
+        irArriba()
         let diametro = app.textFields["campo.Diámetro interior"]
         XCTAssertTrue(diametro.waitForExistence(timeout: 5))
         diametro.borrarTexto()
@@ -60,6 +61,7 @@ final class HydroFesFlowUITests: XCTestCase {
         abrir("inicio.conductos", "opcion.Pérdidas de carga", "opcion.Por fricción")
         cargarEjemplo()
         XCTAssertEqual(resultadoPrincipal(), "0.9242 m")
+        irArriba()
         boton("opcion.Hazen").tap()
         XCTAssertTrue(esperarResultado("0.9849 m"))
         boton("opcion.Manning").tap()
@@ -99,8 +101,7 @@ final class HydroFesFlowUITests: XCTestCase {
         cargarEjemplo()
         XCTAssertTrue(resultadoPrincipal().hasSuffix("m³/s"))
         captura("Canales - resultado")
-        app.swipeDown()
-        app.swipeDown()
+        irArriba()
         captura("Canales - sección rectangular")
         for geometria in ["Triangular", "Trapezoidal", "Circular", "Rectangular"] {
             boton("opcion.\(geometria)").tap()
@@ -125,6 +126,7 @@ final class HydroFesFlowUITests: XCTestCase {
         app.launch()
         abrir("inicio.canales")
         cargarEjemplo()
+        irArriba()
         boton("opcion.Circular").tap()
         let diametro = app.textFields["campo.Diámetro D"]
         XCTAssertTrue(diametro.waitForExistence(timeout: 5))
@@ -144,6 +146,11 @@ final class HydroFesFlowUITests: XCTestCase {
     }
 
     // MARK: - Ayudas
+
+    private func irArriba() {
+        app.swipeDown()
+        app.swipeDown()
+    }
 
     private func captura(_ nombre: String) {
         let adjunto = XCTAttachment(screenshot: app.screenshot())
