@@ -1,61 +1,31 @@
-//
-//  ContentView.swift
-//  HydroFesFlow
-//
-//  Created by Jesús Alberto López Alonso on 10/13/26.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        let paleta = HidroPaleta.de(scheme)
+        NavigationStack {
+            InicioView()
+                .navigationDestination(for: Ruta.self) { ruta in
+                    switch ruta {
+                    case .conductos: MenuConductosView()
+                    case .perdidas: MenuPerdidasView()
+                    case .caudal: CaudalView()
+                    case .diametro: DiametroView()
+                    case .friccion: PerdidasFriccionView()
+                    case .locales: PerdidasLocalesView()
+                    case .celeridad: CeleridadView()
+                    case .canales: CanalesView()
+                    case .documentacion: DocumentacionView()
                     }
                 }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+        .environment(\.hidro, paleta)
+        .tint(paleta.primario)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }

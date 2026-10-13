@@ -27,6 +27,9 @@ final class HydroFesFlowUITests: XCTestCase {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
         app.launch()
+        XCTAssertTrue(app.staticTexts["HidroFES Flow"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Conductos a presión"].exists)
+        XCTAssertTrue(app.staticTexts["Canales"].exists)
 
         // Use XCTAssert and related functions to verify your tests produce the correct results.
         // XCUIAutomation Documentation
