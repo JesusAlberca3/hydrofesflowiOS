@@ -79,15 +79,20 @@ enum PerdidasLocales {
         coeficienteKTotal: Double,
         factorFriccion: Double? = nil
     ) -> Resultado<PerdidaLocal> {
-        if diametroM <= 0 { return .error(Errores.diametroInvalido) }
-        if caudalM3s <= 0 { return .error(Errores.caudalInvalido) }
+        if !Validacion.positivo(diametroM) { return .error(Errores.diametroInvalido) }
+        if !Validacion.positivo(caudalM3s) { return .error(Errores.caudalInvalido) }
+        if !Validacion.noNegativo(coeficienteKTotal) { return .error(Errores.kNegativo) }
 
         let area = PerdidasFriccion.areaCircular(diametroM)
         let velocidad = caudalM3s / area
         let cargaVelocidad = velocidad * velocidad / (2 * Constantes.gravedad)
         let perdida = coeficienteKTotal * cargaVelocidad
-        let longitudEquivalente = factorFriccion.flatMap { f -> Double? in
-            f > 0 ? coeficienteKTotal * diametroM / f : nil
+        let longitudEquivalente = Validacion.opcionalPositivo(factorFriccion).map { f in
+            coeficienteKTotal * diametroM / f
+        }
+        guard Validacion.positivo(area), Validacion.positivo(velocidad),
+              Validacion.finitos(cargaVelocidad, perdida, longitudEquivalente) else {
+            return .error(Errores.fueraDeRango)
         }
 
         var advertencias: [String] = []

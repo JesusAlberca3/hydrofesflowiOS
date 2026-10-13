@@ -44,10 +44,11 @@ enum FlujoGravedad {
         cargaDisponibleM: Double,
         sumaK: Double
     ) -> Resultado<ResultadoCaudal> {
-        if diametroM <= 0 { return .error(Errores.diametroInvalido) }
-        if longitudM <= 0 { return .error(Errores.longitudInvalida) }
-        if cargaDisponibleM <= 0 { return .error(Errores.cargaInvalida) }
-        if sumaK < 0 { return .error(Errores.kNegativo) }
+        if !Validacion.positivo(diametroM) { return .error(Errores.diametroInvalido) }
+        if !Validacion.positivo(longitudM) { return .error(Errores.longitudInvalida) }
+        if !Validacion.positivo(cargaDisponibleM) { return .error(Errores.cargaInvalida) }
+        if !Validacion.noNegativo(sumaK) { return .error(Errores.kNegativo) }
+        if !Validacion.noNegativo(rugosidadMm) { return .error(Errores.rugosidadInvalida) }
 
         let rugosidadM = rugosidadMm / 1000
         var f = 0.02
@@ -72,17 +73,25 @@ enum FlujoGravedad {
         velocidad = velocidadPorEnergia(cargaDisponibleM, f, longitudM, diametroM, sumaK)
         let area = Double.pi * diametroM * diametroM / 4
         let cargaVelocidad = velocidad * velocidad / (2 * Constantes.gravedad)
+        let caudal = area * velocidad
+        let perdidaFriccion = f * (longitudM / diametroM) * cargaVelocidad
+        let perdidaLocal = sumaK * cargaVelocidad
+
+        guard Validacion.positivo(caudal), Validacion.positivo(velocidad), Validacion.positivo(f),
+              Validacion.finitos(reynolds, perdidaFriccion, perdidaLocal, cargaVelocidad) else {
+            return .error(Errores.fueraDeRango)
+        }
 
         return .exito(
             ResultadoCaudal(
-                caudalM3s: area * velocidad,
+                caudalM3s: caudal,
                 velocidad: velocidad,
                 area: area,
                 factorFriccion: f,
                 reynolds: reynolds,
                 regimen: Friccion.regimen(reynolds),
-                perdidaFriccionM: f * (longitudM / diametroM) * cargaVelocidad,
-                perdidaLocalM: sumaK * cargaVelocidad,
+                perdidaFriccionM: perdidaFriccion,
+                perdidaLocalM: perdidaLocal,
                 cargaVelocidadM: cargaVelocidad,
                 iteraciones: iteraciones
             ),
@@ -97,10 +106,11 @@ enum FlujoGravedad {
         cargaDisponibleM: Double,
         sumaK: Double
     ) -> Resultado<ResultadoDiametro> {
-        if caudalM3s <= 0 { return .error(Errores.caudalInvalido) }
-        if longitudM <= 0 { return .error(Errores.longitudInvalida) }
-        if cargaDisponibleM <= 0 { return .error(Errores.cargaInvalida) }
-        if sumaK < 0 { return .error(Errores.kNegativo) }
+        if !Validacion.positivo(caudalM3s) { return .error(Errores.caudalInvalido) }
+        if !Validacion.positivo(longitudM) { return .error(Errores.longitudInvalida) }
+        if !Validacion.positivo(cargaDisponibleM) { return .error(Errores.cargaInvalida) }
+        if !Validacion.noNegativo(sumaK) { return .error(Errores.kNegativo) }
+        if !Validacion.noNegativo(rugosidadMm) { return .error(Errores.rugosidadInvalida) }
 
         let rugosidadM = rugosidadMm / 1000
         var diametro = diametroInicial
@@ -129,6 +139,13 @@ enum FlujoGravedad {
         let area = Double.pi * diametro * diametro / 4
         let velocidad = caudalM3s / area
         let cargaVelocidad = velocidad * velocidad / (2 * Constantes.gravedad)
+        let perdidaFriccion = f * (longitudM / diametro) * cargaVelocidad
+        let perdidaLocal = sumaK * cargaVelocidad
+
+        guard Validacion.positivo(area), Validacion.positivo(velocidad), Validacion.positivo(f),
+              Validacion.finitos(reynolds, perdidaFriccion, perdidaLocal, cargaVelocidad) else {
+            return .error(Errores.fueraDeRango)
+        }
 
         var advertencias = advertenciasVelocidad(velocidad)
         if iteraciones >= maxIteraciones {
@@ -145,8 +162,8 @@ enum FlujoGravedad {
                 factorFriccion: f,
                 reynolds: reynolds,
                 regimen: Friccion.regimen(reynolds),
-                perdidaFriccionM: f * (longitudM / diametro) * cargaVelocidad,
-                perdidaLocalM: sumaK * cargaVelocidad,
+                perdidaFriccionM: perdidaFriccion,
+                perdidaLocalM: perdidaLocal,
                 cargaVelocidadM: cargaVelocidad,
                 iteraciones: iteraciones
             ),

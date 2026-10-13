@@ -22,9 +22,9 @@ enum Celeridad {
         longitudConduccionM: Double? = nil,
         velocidadRegimen: Double? = nil
     ) -> Resultado<ResultadoCeleridad> {
-        if diametroInteriorM <= 0 { return .error(Errores.diametroInvalido) }
-        if espesorM <= 0 { return .error(Errores.espesorInvalido) }
-        if moduloYoungPa <= 0 { return .error(Errores.materialInvalido) }
+        if !Validacion.positivo(diametroInteriorM) { return .error(Errores.diametroInvalido) }
+        if !Validacion.positivo(espesorM) { return .error(Errores.espesorInvalido) }
+        if !Validacion.positivo(moduloYoungPa) { return .error(Errores.materialInvalido) }
 
         let rho = Constantes.densidadAgua
         let k = Constantes.moduloVolumetricoAgua
@@ -44,11 +44,10 @@ enum Celeridad {
             )
         }
 
-        let tiempo = longitudConduccionM.flatMap { longitud -> Double? in
-            longitud > 0 ? 2 * longitud / celeridad : nil
-        }
-        let joukowsky = velocidadRegimen.flatMap { velocidad -> Double? in
-            velocidad > 0 ? celeridad * velocidad / Constantes.gravedad : nil
+        let tiempo = Validacion.opcionalPositivo(longitudConduccionM).map { 2 * $0 / celeridad }
+        let joukowsky = Validacion.opcionalPositivo(velocidadRegimen).map { celeridad * $0 / Constantes.gravedad }
+        guard Validacion.positivo(celeridad), Validacion.finitos(tiempo, joukowsky) else {
+            return .error(Errores.fueraDeRango)
         }
 
         return .exito(

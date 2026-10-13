@@ -87,7 +87,8 @@ enum Canales {
         guard let seccion = seccionMojada(datos) else {
             return .error(Errores.datosIncompletos)
         }
-        if seccion.area <= 0 || seccion.perimetroMojado <= 0 {
+        if !Validacion.positivo(seccion.area) || !Validacion.positivo(seccion.perimetroMojado)
+            || !seccion.espejoAgua.isFinite {
             return .error(Errores.geometriaInvalida)
         }
 
@@ -97,7 +98,11 @@ enum Canales {
         let energia = datos.tirante + velocidad * velocidad / (2 * Constantes.gravedad)
         let profundidad = seccion.profundidadHidraulica
         let froude = profundidad.map { velocidad / sqrt(Constantes.gravedad * $0) }
-        let critico = tiranteCritico(datos, caudal: caudal)
+        guard Validacion.positivo(radio), Validacion.positivo(caudal), Validacion.positivo(velocidad),
+              Validacion.finitos(energia, profundidad, froude) else {
+            return .error(Errores.fueraDeRango)
+        }
+        let critico = tiranteCritico(datos, caudal: caudal).flatMap(Validacion.opcionalPositivo)
 
         var advertencias: [String] = []
         if profundidad == nil {
@@ -211,23 +216,21 @@ enum Canales {
     }
 
     private static func validar(_ datos: DatosCanal) -> Resultado<ResultadoCanal>? {
-        if datos.pendiente <= 0 { return .error(Errores.pendienteInvalida) }
-        if datos.manning <= 0 { return .error(Errores.manningInvalido) }
-        if datos.tirante <= 0 { return .error(Errores.tiranteInvalido) }
-        if datos.geometria == .rectangular && datos.anchoPlantilla <= 0 {
-            return .error(Errores.anchoInvalido)
-        }
-        if datos.geometria == .triangular && datos.talud <= 0 {
-            return .error(Errores.taludInvalido)
-        }
-        if datos.geometria == .trapezoidal && (datos.anchoPlantilla < 0 || datos.talud <= 0) {
-            return .error(Errores.trapecioInvalido)
-        }
-        if datos.geometria == .circular && datos.diametro <= 0 {
-            return .error(Errores.diametroInvalido)
-        }
-        if datos.geometria == .circular && datos.tirante > datos.diametro {
-            return .error(Errores.tiranteCircular)
+        if !Validacion.positivo(datos.pendiente) { return .error(Errores.pendienteInvalida) }
+        if !Validacion.positivo(datos.manning) { return .error(Errores.manningInvalido) }
+        if !Validacion.positivo(datos.tirante) { return .error(Errores.tiranteInvalido) }
+        switch datos.geometria {
+        case .rectangular:
+            if !Validacion.positivo(datos.anchoPlantilla) { return .error(Errores.anchoInvalido) }
+        case .triangular:
+            if !Validacion.positivo(datos.talud) { return .error(Errores.taludInvalido) }
+        case .trapezoidal:
+            if !Validacion.noNegativo(datos.anchoPlantilla) || !Validacion.positivo(datos.talud) {
+                return .error(Errores.trapecioInvalido)
+            }
+        case .circular:
+            if !Validacion.positivo(datos.diametro) { return .error(Errores.diametroInvalido) }
+            if datos.tirante > datos.diametro { return .error(Errores.tiranteCircular) }
         }
         return nil
     }

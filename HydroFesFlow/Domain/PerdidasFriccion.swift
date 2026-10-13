@@ -61,6 +61,7 @@ enum PerdidasFriccion {
         caudalM3s: Double
     ) -> Resultado<PerdidaFriccion> {
         if let error = validarConducto(longitudM, diametroM, caudalM3s) { return error }
+        if !Validacion.noNegativo(rugosidadMm) { return .error(Errores.rugosidadInvalida) }
 
         let area = areaCircular(diametroM)
         let velocidad = caudalM3s / area
@@ -69,6 +70,10 @@ enum PerdidasFriccion {
         let cargaVelocidad = velocidad * velocidad / (2 * Constantes.gravedad)
         let perdida = f * (longitudM / diametroM) * cargaVelocidad
         let regimen = Friccion.regimen(reynolds)
+        if !resultadoValido(area: area, velocidad: velocidad, perdida: perdida, cargaVelocidad: cargaVelocidad, longitudM: longitudM)
+            || !Validacion.finitos(reynolds, f) || f <= 0 {
+            return .error(Errores.fueraDeRango)
+        }
 
         var advertencias: [String] = []
         if regimen == .transicion {
@@ -101,11 +106,15 @@ enum PerdidasFriccion {
         caudalM3s: Double
     ) -> Resultado<PerdidaFriccion> {
         if let error = validarConducto(longitudM, diametroM, caudalM3s) { return error }
-        if coeficienteC <= 0 { return .error(Errores.coeficienteInvalido) }
+        if !Validacion.positivo(coeficienteC) { return .error(Errores.coeficienteInvalido) }
 
         let area = areaCircular(diametroM)
         let velocidad = caudalM3s / area
         let perdida = 10.674 * longitudM * pow(caudalM3s / coeficienteC, 1.852) / pow(diametroM, 4.871)
+        let cargaVelocidad = velocidad * velocidad / (2 * Constantes.gravedad)
+        if !resultadoValido(area: area, velocidad: velocidad, perdida: perdida, cargaVelocidad: cargaVelocidad, longitudM: longitudM) {
+            return .error(Errores.fueraDeRango)
+        }
 
         var advertencias: [String] = []
         if diametroM < 0.05 {
@@ -124,7 +133,7 @@ enum PerdidasFriccion {
                 area: area,
                 velocidad: velocidad,
                 gradienteHidraulico: perdida / longitudM,
-                cargaVelocidad: velocidad * velocidad / (2 * Constantes.gravedad),
+                cargaVelocidad: cargaVelocidad,
                 reynolds: nil,
                 factorFriccion: nil,
                 regimen: nil
@@ -141,12 +150,16 @@ enum PerdidasFriccion {
         caudalM3s: Double
     ) -> Resultado<PerdidaFriccion> {
         if let error = validarConducto(longitudM, diametroM, caudalM3s) { return error }
-        if coeficienteN <= 0 { return .error(Errores.coeficienteInvalido) }
+        if !Validacion.positivo(coeficienteN) { return .error(Errores.coeficienteInvalido) }
 
         let area = areaCircular(diametroM)
         let velocidad = caudalM3s / area
         let perdida = constanteManning * coeficienteN * coeficienteN * longitudM
             * caudalM3s * caudalM3s / pow(diametroM, 16.0 / 3.0)
+        let cargaVelocidad = velocidad * velocidad / (2 * Constantes.gravedad)
+        if !resultadoValido(area: area, velocidad: velocidad, perdida: perdida, cargaVelocidad: cargaVelocidad, longitudM: longitudM) {
+            return .error(Errores.fueraDeRango)
+        }
 
         return .exito(
             PerdidaFriccion(
@@ -155,7 +168,7 @@ enum PerdidasFriccion {
                 area: area,
                 velocidad: velocidad,
                 gradienteHidraulico: perdida / longitudM,
-                cargaVelocidad: velocidad * velocidad / (2 * Constantes.gravedad),
+                cargaVelocidad: cargaVelocidad,
                 reynolds: nil,
                 factorFriccion: nil,
                 regimen: nil
@@ -173,9 +186,22 @@ enum PerdidasFriccion {
         _ diametroM: Double,
         _ caudalM3s: Double
     ) -> Resultado<PerdidaFriccion>? {
-        if longitudM <= 0 { return .error(Errores.longitudInvalida) }
-        if diametroM <= 0 { return .error(Errores.diametroInvalido) }
-        if caudalM3s <= 0 { return .error(Errores.caudalInvalido) }
+        if !Validacion.positivo(longitudM) { return .error(Errores.longitudInvalida) }
+        if !Validacion.positivo(diametroM) { return .error(Errores.diametroInvalido) }
+        if !Validacion.positivo(caudalM3s) { return .error(Errores.caudalInvalido) }
         return nil
+    }
+
+    /// Descarta desbordamientos (∞, NaN) y subdesbordamientos que dejan el área en cero.
+    private static func resultadoValido(
+        area: Double,
+        velocidad: Double,
+        perdida: Double,
+        cargaVelocidad: Double,
+        longitudM: Double
+    ) -> Bool {
+        Validacion.positivo(area) && Validacion.positivo(velocidad)
+            && Validacion.noNegativo(perdida) && Validacion.noNegativo(cargaVelocidad)
+            && (perdida / longitudM).isFinite
     }
 }

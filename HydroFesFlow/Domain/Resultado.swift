@@ -26,7 +26,27 @@ enum Resultado<T> {
     }
 }
 
+/// Comprobaciones numéricas compartidas. `NaN` no cumple `<= 0`, así que
+/// cada entrada se valida también como finita.
+enum Validacion {
+    static func positivo(_ valor: Double) -> Bool { valor.isFinite && valor > 0 }
+
+    static func noNegativo(_ valor: Double) -> Bool { valor.isFinite && valor >= 0 }
+
+    static func finitos(_ valores: Double?...) -> Bool {
+        valores.allSatisfy { $0?.isFinite ?? true }
+    }
+
+    /// Dato opcional: se descarta si no es un número positivo y finito.
+    static func opcionalPositivo(_ valor: Double?) -> Double? {
+        guard let valor, positivo(valor) else { return nil }
+        return valor
+    }
+}
+
 enum Errores {
+    static let fueraDeRango = "Con estos datos el cálculo se sale del rango numérico. Revisa las unidades y el orden de magnitud de cada valor."
+    static let rugosidadInvalida = "La rugosidad del material no puede ser negativa."
     static let datosIncompletos = "Completa todos los campos con valores numéricos válidos."
     static let diametroInvalido = "El diámetro debe ser mayor que cero."
     static let longitudInvalida = "La longitud debe ser mayor que cero."

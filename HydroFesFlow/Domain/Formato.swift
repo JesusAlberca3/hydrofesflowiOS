@@ -13,7 +13,8 @@ enum Formato {
     static func cientifico(_ valor: Double, decimales: Int = 3) -> String {
         if valor.isNaN { return "—" }
         if valor.isInfinite { return "∞" }
-        return String(format: "%.\(decimales)e", locale: locale, valor)
+        // Foundation en Linux usa «E» mayúscula; se fija la minúscula de la app Android.
+        return String(format: "%.\(decimales)e", locale: locale, valor).lowercased()
     }
 
     /// Elige notación fija o científica según la magnitud del valor.
