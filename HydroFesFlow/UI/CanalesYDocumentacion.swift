@@ -1,151 +1,117 @@
 import SwiftUI
 
-struct CanalesView: View {
+/// Dibujo de la sección transversal con el tirante introducido.
+struct SeccionCanalView: View {
     @Environment(\.hidro) private var hidro
-    @State private var geometria = GeometriaCanal.rectangular
-    @State private var pendiente = ""
-    @State private var manning = ""
-    @State private var tirante = EntradaLongitud()
-    @State private var ancho = EntradaLongitud()
-    @State private var talud = ""
-    @State private var diametro = EntradaLongitud()
-    @State private var renglones: [Renglon] = []
-    @State private var error: String?
-    @State private var advertencias: [String] = []
+    let perfil: PerfilSeccion?
 
-    private var datosCompletos: Bool {
-        let comunes = Parseo.double(pendiente) != nil && Parseo.double(manning) != nil && tirante.valorMetros != nil
-        guard comunes else { return false }
-        switch geometria {
-        case .rectangular: return ancho.valorMetros != nil
-        case .triangular: return Parseo.double(talud) != nil
-        case .trapezoidal: return ancho.valorMetros != nil && Parseo.double(talud) != nil
-        case .circular: return diametro.valorMetros != nil
+    var body: some View {
+        ZStack {
+            if let perfil {
+                Canvas { contexto, tamano in
+                    let margen: CGFloat = 12
+                    let escala = min(
+                        (tamano.width - 2 * margen) / perfil.ancho,
+                        (tamano.height - 2 * margen) / perfil.alto
+                    )
+                    let dx = (tamano.width - perfil.ancho * escala) / 2
+                    let dy = (tamano.height - perfil.alto * escala) / 2
+                    func aPantalla(_ p: Punto) -> CGPoint {
+                        CGPoint(x: dx + p.x * escala, y: tamano.height - dy - p.y * escala)
+                    }
+
+                    var agua = Path()
+                    agua.addLines(perfil.agua.map(aPantalla))
+                    agua.closeSubpath()
+                    contexto.fill(agua, with: .color(hidro.acentoSecundario.opacity(0.45)))
+
+                    if let primero = perfil.agua.first, let ultimo = perfil.agua.last {
+                        var superficie = Path()
+                        superficie.move(to: aPantalla(primero))
+                        superficie.addLine(to: aPantalla(ultimo))
+                        contexto.stroke(superficie, with: .color(hidro.acentoSecundario), lineWidth: 2)
+                    }
+
+                    var contorno = Path()
+                    contorno.addLines(perfil.contorno.map(aPantalla))
+                    if perfil.cerrado { contorno.closeSubpath() }
+                    contexto.stroke(contorno, with: .color(hidro.sobreFondo), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                }
+                .accessibilityLabel("Sección con tirante de \(Formato.numero(perfil.tirante, decimales: 3)) m")
+            } else {
+                VStack(spacing: 6) {
+                    Image(systemName: "water.waves")
+                        .font(.title2)
+                    Text("Completa la geometría para ver la sección")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundStyle(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 150)
+        .background(hidro.fondo.opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .animation(.easeInOut(duration: 0.2), value: perfil)
     }
+}
+
+struct CanalesView: View {
+    @State private var form = FormularioCanal()
+    @State private var calculado: FormularioCanal?
+    @State private var salida = SalidaCalculo.vacia
 
     var body: some View {
         PantallaCalculo(
             titulo: "Canales",
-            subtitulo: "Flujo uniforme · \(geometria.etiqueta)",
+            subtitulo: "Flujo uniforme · \(form.geometria.etiqueta)",
             accion: "Calcular",
-            accionHabilitada: datosCompletos,
-            onCalcular: calcular
+            accionHabilitada: form.datosCompletos,
+            onCalcular: calcular,
+            onEjemplo: { form = .ejemplo; calcular() },
+            onLimpiar: { form = FormularioCanal(); calculado = nil; salida = .vacia }
         ) {
             SeccionTarjeta(titulo: "Geometría de la sección", simbolo: "square.split.2x1") {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(GeometriaCanal.allCases) { opcion in
-                            Button(opcion.etiqueta) {
-                                geometria = opcion
-                                renglones = []
-                                error = nil
-                                advertencias = []
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Capsule().fill(geometria == opcion ? hidro.primario : hidro.variante.opacity(0.9)))
-                            .foregroundStyle(geometria == opcion ? hidro.sobrePrimario : hidro.sobreFondo)
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                switch geometria {
+                SelectorCapsulas(opciones: GeometriaCanal.allCases, seleccion: $form.geometria, etiqueta: \.etiqueta, repartirAncho: false)
+                SeccionCanalView(perfil: form.datos.flatMap(PerfilSeccion.de))
+                switch form.geometria {
                 case .rectangular:
-                    CampoLongitud(etiqueta: "Ancho de plantilla b", entrada: $ancho)
+                    CampoLongitud(etiqueta: "Ancho de plantilla b", entrada: $form.ancho, aviso: form.avisoAncho)
                 case .triangular:
-                    CampoNumerico(etiqueta: "Talud z (H:V)", texto: $talud)
+                    CampoNumerico(etiqueta: "Talud z (H:V)", texto: $form.talud, aviso: form.avisoTalud)
                 case .trapezoidal:
-                    CampoLongitud(etiqueta: "Ancho de plantilla b", entrada: $ancho)
-                    CampoNumerico(etiqueta: "Talud z (H:V)", texto: $talud)
+                    CampoLongitud(etiqueta: "Ancho de plantilla b", entrada: $form.ancho, aviso: form.avisoAncho)
+                    CampoNumerico(etiqueta: "Talud z (H:V)", texto: $form.talud, aviso: form.avisoTalud)
                 case .circular:
-                    CampoLongitud(etiqueta: "Diámetro D", entrada: $diametro)
+                    CampoLongitud(etiqueta: "Diámetro D", entrada: $form.diametro)
                 }
-                CampoLongitud(etiqueta: "Tirante y", entrada: $tirante)
+                CampoLongitud(etiqueta: "Tirante y", entrada: $form.tirante, aviso: form.avisoTirante)
             }
             SeccionTarjeta(
                 titulo: "Resistencia y pendiente",
                 simbolo: "slider.horizontal.3",
                 descripcion: "Q = (1/n) · A · R^(2/3) · √S"
             ) {
-                CampoNumerico(etiqueta: "Pendiente hidráulica S", texto: $pendiente, sufijo: "m/m")
+                CampoNumerico(etiqueta: "Pendiente hidráulica S", texto: $form.pendiente, sufijo: "m/m", aviso: form.avisoPendiente)
                 CampoNumerico(
                     etiqueta: "Coeficiente de Manning n",
-                    texto: $manning,
-                    ayuda: "Tierra 0.025 · Concreto 0.014 · PVC 0.009"
+                    texto: $form.manning,
+                    ayuda: "Tierra 0.025 · Concreto 0.014 · PVC 0.009",
+                    aviso: form.avisoManning
                 )
             }
-            PanelResultados(renglones: renglones, error: error, advertencias: advertencias)
+            PanelResultados(salida: salida, titulo: "Canales", desactualizado: calculado != nil && calculado != form)
+                .id(IdentificadorUI.resultados)
+        }
+        .onChange(of: form.geometria) {
+            calculado = nil
+            salida = .vacia
         }
     }
 
     private func calcular() {
-        guard let s = Parseo.double(pendiente), let n = Parseo.double(manning), let y = tirante.valorMetros else {
-            renglones = []
-            error = Errores.datosIncompletos
-            advertencias = []
-            return
-        }
-        let datos = DatosCanal(
-            geometria: geometria,
-            pendiente: s,
-            manning: n,
-            tirante: y,
-            anchoPlantilla: ancho.valorMetros ?? 0,
-            talud: Parseo.double(talud) ?? 0,
-            diametro: diametro.valorMetros ?? 0
-        )
-        switch Canales.calcular(datos) {
-        case .error(let mensaje):
-            renglones = []
-            error = mensaje
-            advertencias = []
-        case .exito(let valor, let avisos):
-            error = nil
-            advertencias = avisos
-            var filas = [
-                Renglon(
-                    etiqueta: "Caudal Q",
-                    valor: Formato.conUnidad(valor.caudal, "m³/s"),
-                    destacado: true,
-                    nota: "\(Formato.numero(UnidadCaudal.litroSegundo.desdeM3s(valor.caudal), decimales: 1)) L/s"
-                ),
-                Renglon(etiqueta: "Velocidad media V", valor: Formato.conUnidad(valor.velocidad, "m/s")),
-                Renglon(etiqueta: "Área hidráulica A", valor: Formato.conUnidad(valor.area, "m²")),
-                Renglon(etiqueta: "Perímetro mojado P", valor: Formato.conUnidad(valor.perimetroMojado, "m")),
-                Renglon(etiqueta: "Radio hidráulico R", valor: Formato.conUnidad(valor.radioHidraulico, "m")),
-                Renglon(etiqueta: "Espejo de agua T", valor: Formato.conUnidad(valor.espejoAgua, "m")),
-            ]
-            if let profundidad = valor.profundidadHidraulica {
-                filas.append(Renglon(etiqueta: "Profundidad hidráulica A/T", valor: Formato.conUnidad(profundidad, "m")))
-            }
-            filas.append(Renglon(etiqueta: "Energía específica E", valor: Formato.conUnidad(valor.energiaEspecifica, "m")))
-            if let froude = valor.numeroFroude {
-                filas.append(Renglon(etiqueta: "Número de Froude Fr", valor: Formato.numero(froude, decimales: 4)))
-                if let regimen = valor.regimen {
-                    let color: Color = switch regimen {
-                    case .subcritico: hidro.subcritico
-                    case .critico: hidro.critico
-                    case .supercritico: hidro.supercritico
-                    }
-                    filas.append(Renglon(etiqueta: "Régimen", valor: regimen.etiqueta, nota: regimen.nota, acento: color))
-                }
-            } else {
-                filas.append(Renglon(etiqueta: "Número de Froude Fr", valor: "no definido", nota: "T → 0, sección llena"))
-            }
-            if let yc = valor.tiranteCritico {
-                filas.append(Renglon(
-                    etiqueta: "Tirante crítico y_c",
-                    valor: Formato.conUnidad(yc, "m"),
-                    nota: "Resuelto por bisección sobre Q²T/(gA³) = 1"
-                ))
-            }
-            if let llenado = valor.relacionLlenado {
-                filas.append(Renglon(etiqueta: "Relación de llenado y/D", valor: Formato.numero(llenado, decimales: 3)))
-            }
-            renglones = filas
-        }
+        salida = form.calcular()
+        calculado = form
     }
 }
 
@@ -167,6 +133,8 @@ struct DocumentacionView: View {
                 "Longitud y caudal llevan su propia unidad. Debajo del campo aparece el valor ya convertido a metros o a m³/s, que es el que entra al cálculo.",
                 "El separador decimal puede ser punto o coma. El botón de calcular se activa cuando todos los campos obligatorios tienen un número.",
                 "El material trae juntos la rugosidad, el coeficiente C de Hazen-Williams y el n de Manning. PVC queda seleccionado al abrir la pantalla.",
+                "Si un valor no sirve (cero, negativo o vacío a medias), el campo se marca en rojo y explica por qué.",
+                "El menú ⋯ de cada pantalla carga un ejemplo resuelto o limpia todos los datos.",
             ],
             abiertaAlInicio: true
         ),
@@ -176,8 +144,8 @@ struct DocumentacionView: View {
                 "Caudal: con un diámetro y una carga disponible H, obtiene el gasto que circula.",
                 "Diámetro: con un gasto y la misma carga, obtiene el diámetro necesario.",
                 "Los dos usan H = (1 + f·L/D + ΣK) · V²/2g. Por eso, si pasas el caudal de un módulo al otro, con el resto de datos iguales, recuperas el diámetro de partida.",
-                "ΣK resume las pérdidas en accesorios. Si la tubería no tiene piezas especiales, déjalo en 0. Puedes armarlo en Pérdidas locales.",
-                "El resultado reparte H entre fricción, pérdidas locales y carga de velocidad. Esas tres cifras suman la carga que introdujiste.",
+                "ΣK resume las pérdidas en accesorios. Si la tubería no tiene piezas especiales, déjalo en 0. Puedes armarlo en Pérdidas locales y traerlo con el botón que aparece bajo el campo.",
+                "El resultado reparte H entre fricción, pérdidas locales y carga de velocidad. Esas tres cifras suman la carga que introdujiste; la barra de reparto lo muestra en porcentaje.",
             ],
             abiertaAlInicio: false
         ),
@@ -224,7 +192,8 @@ struct DocumentacionView: View {
             titulo: "Cómo leer el resultado",
             parrafos: [
                 "La tarjeta gris indica que todavía no hay cálculo. La roja describe qué dato falta o qué valor no es válido.",
-                "La tarjeta azul es el resultado. La magnitud principal va en tamaño grande y el icono de copiar la pasa al portapapeles.",
+                "La tarjeta azul es el resultado. La magnitud principal va en tamaño grande; los iconos de copiar y compartir envían todas las líneas.",
+                "Si cambias un dato después de calcular, la tarjeta se atenúa y avisa que hay que volver a calcular.",
                 "La tarjeta verde es una advertencia: el número es válido y hay una condición del método que conviene revisar.",
             ],
             abiertaAlInicio: false

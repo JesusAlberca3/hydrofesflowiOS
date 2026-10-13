@@ -15,6 +15,9 @@ struct HidroPaleta: Equatable {
     var sobreVariante: Color
     var errorContenedor: Color
     var sobreError: Color
+    var textoError: Color
+    var acentoSecundario: Color
+    var acentoTerciario: Color
     var subcritico: Color
     var critico: Color
     var supercritico: Color
@@ -34,6 +37,9 @@ struct HidroPaleta: Equatable {
         sobreVariante: Color(red: 65 / 255, green: 71 / 255, blue: 77 / 255),
         errorContenedor: Color(red: 255 / 255, green: 218 / 255, blue: 214 / 255),
         sobreError: Color(red: 65 / 255, green: 0 / 255, blue: 2 / 255),
+        textoError: Color(red: 186 / 255, green: 26 / 255, blue: 26 / 255),
+        acentoSecundario: Color(red: 0 / 255, green: 101 / 255, blue: 142 / 255),
+        acentoTerciario: Color(red: 0 / 255, green: 150 / 255, blue: 136 / 255),
         subcritico: Color(red: 27 / 255, green: 108 / 255, blue: 58 / 255),
         critico: Color(red: 138 / 255, green: 83 / 255, blue: 0 / 255),
         supercritico: Color(red: 155 / 255, green: 34 / 255, blue: 38 / 255)
@@ -54,9 +60,12 @@ struct HidroPaleta: Equatable {
         sobreVariante: Color(red: 193 / 255, green: 199 / 255, blue: 206 / 255),
         errorContenedor: Color(red: 147 / 255, green: 0 / 255, blue: 10 / 255),
         sobreError: Color(red: 255 / 255, green: 218 / 255, blue: 214 / 255),
-        subcritico: Color(red: 27 / 255, green: 108 / 255, blue: 58 / 255),
-        critico: Color(red: 138 / 255, green: 83 / 255, blue: 0 / 255),
-        supercritico: Color(red: 155 / 255, green: 34 / 255, blue: 38 / 255)
+        textoError: Color(red: 255 / 255, green: 180 / 255, blue: 171 / 255),
+        acentoSecundario: Color(red: 133 / 255, green: 207 / 255, blue: 255 / 255),
+        acentoTerciario: Color(red: 128 / 255, green: 212 / 255, blue: 218 / 255),
+        subcritico: Color(red: 125 / 255, green: 216 / 255, blue: 150 / 255),
+        critico: Color(red: 255 / 255, green: 185 / 255, blue: 92 / 255),
+        supercritico: Color(red: 255 / 255, green: 180 / 255, blue: 171 / 255)
     )
 
     static func de(_ scheme: ColorScheme) -> HidroPaleta {

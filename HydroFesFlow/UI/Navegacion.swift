@@ -36,7 +36,8 @@ struct InicioView: View {
                         simbolo: "drop"
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TarjetaPresionable())
+                .accessibilityIdentifier("inicio.conductos")
 
                 NavigationLink(value: Ruta.canales) {
                     tarjetaAcceso(
@@ -45,7 +46,8 @@ struct InicioView: View {
                         simbolo: "water.waves"
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TarjetaPresionable())
+                .accessibilityIdentifier("inicio.canales")
 
                 Image("Cintillo")
                     .resizable()
@@ -67,6 +69,7 @@ struct InicioView: View {
                     Image(systemName: "info.circle")
                 }
                 .accessibilityLabel("Documentación")
+                .accessibilityIdentifier("inicio.documentacion")
             }
         }
         .toolbarBackground(hidro.contenedorPrimario, for: .navigationBar)
@@ -89,6 +92,9 @@ struct InicioView: View {
                     .multilineTextAlignment(.leading)
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.headline)
+                .foregroundStyle(hidro.sobreVariante.opacity(0.6))
         }
         .padding(20)
         .frame(maxWidth: .infinity, minHeight: 140, alignment: .leading)
@@ -181,12 +187,16 @@ struct ListaOpciones: View {
                             }
                             .foregroundStyle(hidro.sobreContenedorSecundario)
                             Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(hidro.sobreContenedorSecundario.opacity(0.6))
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(hidro.contenedorSecundario, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(TarjetaPresionable())
+                    .accessibilityIdentifier("opcion.\(opcion.titulo)")
                 }
             }
             .padding(16)
@@ -196,5 +206,15 @@ struct ListaOpciones: View {
         .background(hidro.fondo.ignoresSafeArea())
         .toolbarBackground(hidro.contenedorPrimario, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
+/// Estilo de tarjeta que se hunde ligeramente al tocarla.
+struct TarjetaPresionable: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

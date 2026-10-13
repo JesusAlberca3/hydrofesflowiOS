@@ -1,46 +1,173 @@
-//
-//  HydroFesFlowUITests.swift
-//  HydroFesFlowUITests
-//
-//  Created by Jesús Alberto López Alonso on 10/13/26.
-//
-
 import XCTest
 
 final class HydroFesFlowUITests: XCTestCase {
+    private var app: XCUIApplication!
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+        app = XCUIApplication()
+        app.launchArguments = ["--pruebas-ui"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["HidroFES Flow"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Conductos a presión"].exists)
-        XCTAssertTrue(app.staticTexts["Canales"].exists)
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
     }
 
     @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+    func testInicioMuestraLosDosModulos() {
+        XCTAssertTrue(app.staticTexts["HidroFES Flow"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["inicio.conductos"].exists)
+        XCTAssertTrue(app.buttons["inicio.canales"].exists)
+    }
+
+    @MainActor
+    func testCaudalConElEjemploDocumentado() {
+        abrir("inicio.conductos", "opcion.Caudal")
+        XCTAssertFalse(boton("accion.calcular").isEnabled, "Sin datos el botón debe estar desactivado")
+        cargarEjemplo()
+        XCTAssertEqual(resultadoPrincipal(), "214.185 L/s")
+        XCTAssertTrue(existeTexto("Reparto de la carga H"))
+    }
+
+    @MainActor
+    func testDiametroCeroMuestraErrorSinCerrarLaApp() {
+        abrir("inicio.conductos", "opcion.Caudal")
+        cargarEjemplo()
+        let diametro = app.textFields["campo.Diámetro interior"]
+        XCTAssertTrue(diametro.waitForExistence(timeout: 5))
+        diametro.borrarTexto()
+        diametro.typeText("0")
+        XCTAssertTrue(existeTexto("Debe ser mayor que cero."))
+        XCTAssertTrue(existeTexto("Pulsa calcular para actualizar"))
+        app.toolbars.buttons["Listo"].tapSiExiste()
+        boton("accion.calcular").tap()
+        let error = app.descendants(matching: .any)["resultado.error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(error.label.contains("El diámetro debe ser mayor que cero."))
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    @MainActor
+    func testDiametroConElEjemploRecuperaTrescientosMilimetros() {
+        abrir("inicio.conductos", "opcion.Diámetro")
+        cargarEjemplo()
+        XCTAssertEqual(resultadoPrincipal(), "0.3000 m")
+    }
+
+    @MainActor
+    func testFriccionCambiaDeMetodoYRecalcula() {
+        abrir("inicio.conductos", "opcion.Pérdidas de carga", "opcion.Por fricción")
+        cargarEjemplo()
+        XCTAssertEqual(resultadoPrincipal(), "0.9242 m")
+        boton("opcion.Hazen").tap()
+        XCTAssertTrue(esperarResultado("0.9849 m"))
+        boton("opcion.Manning").tap()
+        XCTAssertTrue(esperarResultado("1.1139 m"))
+    }
+
+    @MainActor
+    func testLocalesSumanCoeficientesYPasanAlCaudal() {
+        abrir("inicio.conductos", "opcion.Pérdidas de carga", "opcion.Locales o menores")
+        let mas = boton("accesorio.mas.Codo de 90°")
+        for _ in 0..<4 { mas.tap() }
+        XCTAssertTrue(existeTexto("ΣK = 3.60"))
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        boton("opcion.Caudal").tap()
+        let usar = boton("accion.usarSumaK")
+        usar.desplazarHastaVer(en: app)
+        usar.tap()
+        XCTAssertEqual(app.textFields["campo.Suma de coeficientes locales ΣK"].value as? String, "3.60")
+    }
+
+    @MainActor
+    func testCeleridadConElEjemplo() {
+        abrir("inicio.conductos", "opcion.Celeridad")
+        cargarEjemplo()
+        XCTAssertEqual(resultadoPrincipal(), "1149.32 m/s")
+    }
+
+    @MainActor
+    func testCanalesEnTodasLasGeometrias() {
+        abrir("inicio.canales")
+        cargarEjemplo()
+        XCTAssertTrue(resultadoPrincipal().hasSuffix("m³/s"))
+        for geometria in ["Triangular", "Trapezoidal", "Circular", "Rectangular"] {
+            boton("opcion.\(geometria)").tap()
+            XCTAssertTrue(existeTexto("Introduce los datos y pulsa calcular."), geometria)
+        }
+    }
+
+    @MainActor
+    func testLimpiarDejaElFormularioVacio() {
+        abrir("inicio.conductos", "opcion.Caudal")
+        cargarEjemplo()
+        boton("menu.acciones").tap()
+        app.buttons["Limpiar datos"].tap()
+        XCTAssertTrue(existeTexto("Introduce los datos y pulsa calcular."))
+        XCTAssertFalse(boton("accion.calcular").isEnabled)
+    }
+
+    @MainActor
+    func testDocumentacionSeAbre() {
+        boton("inicio.documentacion").tap()
+        XCTAssertTrue(app.staticTexts["HidroFES Flow 2.0"].waitForExistence(timeout: 5))
+    }
+
+    // MARK: - Ayudas
+
+    private func boton(_ identificador: String) -> XCUIElement {
+        let elemento = app.buttons[identificador]
+        XCTAssertTrue(elemento.waitForExistence(timeout: 10), "No apareció \(identificador)")
+        return elemento
+    }
+
+    private func abrir(_ ruta: String...) {
+        for paso in ruta {
+            boton(paso).tap()
+        }
+    }
+
+    private func cargarEjemplo() {
+        boton("menu.acciones").tap()
+        let ejemplo = app.buttons["Cargar ejemplo"]
+        XCTAssertTrue(ejemplo.waitForExistence(timeout: 5))
+        ejemplo.tap()
+    }
+
+    private func resultadoPrincipal() -> String {
+        let valor = app.staticTexts["resultado.principal"]
+        XCTAssertTrue(valor.waitForExistence(timeout: 10), "No apareció el resultado")
+        return valor.label
+    }
+
+    private func existeTexto(_ fragmento: String, timeout: TimeInterval = 5) -> Bool {
+        let consulta = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", fragmento))
+        return consulta.firstMatch.waitForExistence(timeout: timeout)
+    }
+
+    private func esperarResultado(_ esperado: String) -> Bool {
+        let valor = app.staticTexts["resultado.principal"]
+        let condicion = NSPredicate(format: "label == %@", esperado)
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: condicion, object: valor)], timeout: 5) == .completed
+    }
+}
+
+private extension XCUIElement {
+    /// Toca al final del campo para dejar el cursor detrás del texto y lo borra.
+    func borrarTexto() {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        guard let texto = value as? String, !texto.isEmpty else { return }
+        typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: texto.count))
+    }
+
+    func tapSiExiste() {
+        if exists { tap() }
+    }
+
+    func desplazarHastaVer(en app: XCUIApplication) {
+        var intentos = 0
+        while !isHittable && intentos < 5 {
+            app.swipeUp()
+            intentos += 1
         }
     }
 }

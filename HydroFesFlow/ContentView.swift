@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.colorScheme) private var scheme
+    @State private var sesion = SesionHidraulica()
 
     var body: some View {
         let paleta = HidroPaleta.de(scheme)
@@ -22,6 +23,7 @@ struct ContentView: View {
                 }
         }
         .environment(\.hidro, paleta)
+        .environment(sesion)
         .tint(paleta.primario)
     }
 }
