@@ -73,7 +73,7 @@ struct CanalesView: View {
         ) {
             SeccionTarjeta(titulo: "Geometría de la sección", simbolo: "square.split.2x1") {
                 SelectorCapsulas(opciones: GeometriaCanal.allCases, seleccion: $form.geometria, etiqueta: \.etiqueta, repartirAncho: false)
-                SeccionCanalView(perfil: form.datos.flatMap(PerfilSeccion.de))
+                SeccionCanalView(perfil: form.datos.flatMap { PerfilSeccion.de($0) })
                 switch form.geometria {
                 case .rectangular:
                     CampoLongitud(etiqueta: "Ancho de plantilla b", entrada: $form.ancho, aviso: form.avisoAncho)

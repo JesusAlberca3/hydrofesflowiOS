@@ -102,7 +102,7 @@ enum Canales {
               Validacion.finitos(energia, profundidad, froude) else {
             return .error(Errores.fueraDeRango)
         }
-        let critico = tiranteCritico(datos, caudal: caudal).flatMap(Validacion.opcionalPositivo)
+        let critico = tiranteCritico(datos, caudal: caudal).flatMap { Validacion.opcionalPositivo($0) }
 
         var advertencias: [String] = []
         if profundidad == nil {
@@ -133,7 +133,7 @@ enum Canales {
                 velocidad: velocidad,
                 energiaEspecifica: energia,
                 numeroFroude: froude,
-                regimen: froude.map(clasificarRegimen),
+                regimen: froude.map { clasificarRegimen($0) },
                 tiranteCritico: critico,
                 relacionLlenado: datos.geometria == .circular ? datos.tirante / datos.diametro : nil
             ),

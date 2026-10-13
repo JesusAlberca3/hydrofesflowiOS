@@ -24,6 +24,9 @@ final class HydroFesFlowUITests: XCTestCase {
         cargarEjemplo()
         XCTAssertEqual(resultadoPrincipal(), "214.185 L/s")
         XCTAssertTrue(existeTexto("Reparto de la carga H"))
+        captura("Caudal - resultado")
+        app.swipeUp()
+        captura("Caudal - reparto de la carga")
     }
 
     @MainActor
@@ -41,6 +44,7 @@ final class HydroFesFlowUITests: XCTestCase {
         let error = app.descendants(matching: .any)["resultado.error"]
         XCTAssertTrue(error.waitForExistence(timeout: 5))
         XCTAssertTrue(error.label.contains("El diámetro debe ser mayor que cero."))
+        captura("Caudal - error de diámetro cero")
         XCTAssertEqual(app.state, .runningForeground)
     }
 
@@ -60,6 +64,8 @@ final class HydroFesFlowUITests: XCTestCase {
         XCTAssertTrue(esperarResultado("0.9849 m"))
         boton("opcion.Manning").tap()
         XCTAssertTrue(esperarResultado("1.1139 m"))
+        app.swipeUp()
+        captura("Fricción - contraste entre métodos")
     }
 
     @MainActor
@@ -68,6 +74,7 @@ final class HydroFesFlowUITests: XCTestCase {
         let mas = boton("accesorio.mas.Codo de 90°")
         for _ in 0..<4 { mas.tap() }
         XCTAssertTrue(existeTexto("ΣK = 3.60"))
+        captura("Pérdidas locales - accesorios")
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -83,6 +90,7 @@ final class HydroFesFlowUITests: XCTestCase {
         abrir("inicio.conductos", "opcion.Celeridad")
         cargarEjemplo()
         XCTAssertEqual(resultadoPrincipal(), "1149.32 m/s")
+        captura("Celeridad - resultado")
     }
 
     @MainActor
@@ -90,6 +98,10 @@ final class HydroFesFlowUITests: XCTestCase {
         abrir("inicio.canales")
         cargarEjemplo()
         XCTAssertTrue(resultadoPrincipal().hasSuffix("m³/s"))
+        captura("Canales - resultado")
+        app.swipeDown()
+        app.swipeDown()
+        captura("Canales - sección rectangular")
         for geometria in ["Triangular", "Trapezoidal", "Circular", "Rectangular"] {
             boton("opcion.\(geometria)").tap()
             XCTAssertTrue(existeTexto("Introduce los datos y pulsa calcular."), geometria)
@@ -107,12 +119,38 @@ final class HydroFesFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testModoOscuroEnCanalCircular() {
+        app.terminate()
+        app.launchArguments = ["--pruebas-ui", "--modo-oscuro"]
+        app.launch()
+        abrir("inicio.canales")
+        cargarEjemplo()
+        boton("opcion.Circular").tap()
+        let diametro = app.textFields["campo.Diámetro D"]
+        XCTAssertTrue(diametro.waitForExistence(timeout: 5))
+        diametro.tap()
+        diametro.typeText("1.5")
+        app.toolbars.buttons["Listo"].tapSiExiste()
+        captura("Canales - sección circular (oscuro)")
+        boton("accion.calcular").tap()
+        XCTAssertTrue(resultadoPrincipal().hasSuffix("m³/s"))
+        captura("Canales - resultado circular (oscuro)")
+    }
+
+    @MainActor
     func testDocumentacionSeAbre() {
         boton("inicio.documentacion").tap()
         XCTAssertTrue(app.staticTexts["HidroFES Flow 2.0"].waitForExistence(timeout: 5))
     }
 
     // MARK: - Ayudas
+
+    private func captura(_ nombre: String) {
+        let adjunto = XCTAttachment(screenshot: app.screenshot())
+        adjunto.name = nombre
+        adjunto.lifetime = .keepAlways
+        add(adjunto)
+    }
 
     private func boton(_ identificador: String) -> XCUIElement {
         let elemento = app.buttons[identificador]

@@ -186,7 +186,7 @@ struct FormulariosTests {
         form.diametro = EntradaLongitud(texto: "2", unidad: .metro)
         #expect(form.datosCompletos)
         #expect(form.calcular().hayResultado)
-        #expect(form.datos.flatMap(PerfilSeccion.de) != nil)
+        #expect(form.datos.flatMap { PerfilSeccion.de($0) } != nil)
     }
 
     @Test func ceroEnUnCampoDaErrorClaroSinFallar() {
